@@ -97,7 +97,7 @@ func (i *Item) Title() string {
 }
 
 func (i *Item) Trashed() bool {
-	return i.overview.getBool("trashed")
+	return i.data.getBool("trashed")
 }
 
 func (i *Item) Tags() []string {
@@ -216,6 +216,10 @@ func (id *ItemDetail) Fields() []*Field {
 
 func (id *ItemDetail) Notes() string {
 	return id.data.getString("notesPlain")
+}
+
+func (id *ItemDetail) Password() string {
+	return id.data.getString("password")
 }
 
 func (id *ItemDetail) Sections() []*Section {
