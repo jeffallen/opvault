@@ -30,12 +30,12 @@ type Profile struct {
 	data dataMap
 }
 
+var testPeek []byte
+
 func (p *Profile) Unlock(password string) error {
 	passwordBytes := []byte(password)
+	testPeek = passwordBytes
 	defer wipeSlice(passwordBytes)
-
-	assignToTestHook(passwordBytes) // This will call the testonly or stub version
-
 	key := pbkdf2.Key(passwordBytes, p.Salt(), p.Iterations(), 64, sha512.New)
 	p.derivedKey, p.derivedMAC = key[:32], key[32:]
 
@@ -219,12 +219,4 @@ func (p *Profile) readBand(bandPath string) ([]*Item, error) {
 	}
 
 	return items, nil
-}
-
-// testHookMasterPasswordBytes is used by tests to get a reference to the
-// master password bytes used during Profile.Unlock.
-var testHookMasterPasswordBytes []byte
-
-func assignToTestHook(pBytes []byte) {
-	testHookMasterPasswordBytes = pBytes
 }

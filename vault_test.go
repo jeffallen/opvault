@@ -51,12 +51,8 @@ func TestUnlockZerosMasterPassword(t *testing.T) {
 
 	// Ensure the test hook variable is reset after the test.
 	defer func() {
-		testHookMasterPasswordBytes = nil
+		testPeek = nil
 	}()
-
-	// Signal to the test hook that we want to capture the password bytes.
-	// Assign a non-nil slice. The content doesn't matter, only its non-nil status.
-	testHookMasterPasswordBytes = []byte{}
 
 	testPassword := "thisIsATestPassword123!"
 	// We expect Unlock to fail because the password is wrong for the "default" profile,
@@ -71,33 +67,12 @@ func TestUnlockZerosMasterPassword(t *testing.T) {
 		// t.Logf("Unlock failed with an unexpected error: %v. Expected ErrInvalidPassword or success.", err)
 	}
 
-	if testHookMasterPasswordBytes == nil {
-		t.Fatal("testHookMasterPasswordBytes is nil, hook was not effective.")
-	}
-
-	// Check if the captured password bytes were zeroed.
-	// The length should be the length of testPassword.
-	// If assignToTestHook made a copy, this test would be flawed.
-	// But it assigns the actual slice used by Unlock.
-	expectedOriginalLength := len(testPassword)
-	if len(testHookMasterPasswordBytes) != expectedOriginalLength {
-		// This could happen if Unlock exits very early, before assignToTestHook is called,
-		// or if assignToTestHook was not called with the correct slice.
-		// Given the current Unlock logic, passwordBytes is prepared right at the start.
-		// So, if testHookMasterPasswordBytes is not nil, it should hold the reference.
-		// The only way its length would change is if it was re-sliced, which it isn't.
-		// The most likely scenario for it to be non-nil but empty (if testPassword is not empty)
-		// is if it was explicitly set to an empty slice by assignToTestHook, which it shouldn't.
-		// Let's assume it holds the original slice reference.
-		// The deferred wipeSlice should have zeroed it in place.
-
-		// If Unlock failed very early (e.g. profile data missing essential fields for PBKDF2),
-		// testHookMasterPasswordBytes might still be the initial empty slice assigned.
-		// But Unlock prepares passwordBytes and calls assignToTestHook before operations that might fail early.
+	if testPeek == nil {
+		t.Fatal("testPeek is nil")
 	}
 
 	allZero := true
-	for i, b := range testHookMasterPasswordBytes {
+	for i, b := range testPeek {
 		if b != 0 {
 			allZero = false
 			t.Errorf("Byte at index %d was not zeroed: got %x", i, b)
@@ -105,23 +80,41 @@ func TestUnlockZerosMasterPassword(t *testing.T) {
 	}
 
 	if !allZero {
-		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", testHookMasterPasswordBytes)
+		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", testPeek)
 	} else {
-		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(testHookMasterPasswordBytes))
+		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(testPeek))
 	}
 
-	// Additional check: ensure the length of the slice is what we expect,
-	// and it's not, for example, an empty slice if the password was non-empty.
-	// This helps confirm assignToTestHook correctly captured the slice.
-	if len(testPassword) > 0 && expectedOriginalLength == 0 && len(testHookMasterPasswordBytes) == 0 {
-		// This case implies testHookMasterPasswordBytes might still be the `[]byte{}` we initialized it with,
-		// meaning assignToTestHook might not have updated it.
-		// However, the earlier nil check for testHookMasterPasswordBytes should ideally mean
-		// it was reassigned by assignToTestHook if testPassword was processed.
-		// The critical part is that `assignToTestHook` assigns the actual slice `passwordBytes` from `Unlock`.
-		// Then `wipeSlice` zeros that same slice.
-		// If testHookMasterPasswordBytes is not nil, it must be that slice.
-	} else if len(testHookMasterPasswordBytes) != expectedOriginalLength {
-		t.Errorf("Expected testHookMasterPasswordBytes to have length %d (original password length), but got %d. This might indicate the hook didn't capture the correct slice.", expectedOriginalLength, len(testHookMasterPasswordBytes))
+	if len(testPeek) != len(testPassword) {
+		t.Errorf("Expected testHookMasterPasswordBytes to have length %d (original password length), but got %d. This might indicate the hook didn't capture the correct slice.", len(testPassword), len(testPeek))
+	}
+
+	testPassword = "freddy"
+
+	err = profile.Unlock(testPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if testPeek == nil {
+		t.Fatal("testPeek is nil")
+	}
+
+	allZero = true
+	for i, b := range testPeek {
+		if b != 0 {
+			allZero = false
+			t.Errorf("Byte at index %d was not zeroed: got %x", i, b)
+		}
+	}
+
+	if !allZero {
+		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", testPeek)
+	} else {
+		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(testPeek))
+	}
+
+	if len(testPeek) != len(testPassword) {
+		t.Errorf("Expected testHookMasterPasswordBytes to have length %d (original password length), but got %d. This might indicate the hook didn't capture the correct slice.", len(testPassword), len(testPeek))
 	}
 }
