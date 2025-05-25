@@ -31,7 +31,12 @@ type Profile struct {
 }
 
 func (p *Profile) Unlock(password string) error {
-	key := pbkdf2.Key([]byte(password), p.Salt(), p.Iterations(), 64, sha512.New)
+	passwordBytes := []byte(password)
+	defer wipeSlice(passwordBytes)
+
+	assignToTestHook(passwordBytes) // This will call the testonly or stub version
+
+	key := pbkdf2.Key(passwordBytes, p.Salt(), p.Iterations(), 64, sha512.New)
 	p.derivedKey, p.derivedMAC = key[:32], key[32:]
 
 	masterKey, err := decryptOpdata01(p.data.getBytes("masterKey"), p.derivedKey, p.derivedMAC)
