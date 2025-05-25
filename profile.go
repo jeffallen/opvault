@@ -30,8 +30,13 @@ type Profile struct {
 	data dataMap
 }
 
+var testPeek []byte
+
 func (p *Profile) Unlock(password string) error {
-	key := pbkdf2.Key([]byte(password), p.Salt(), p.Iterations(), 64, sha512.New)
+	passwordBytes := []byte(password)
+	testPeek = passwordBytes
+	defer wipeSlice(passwordBytes)
+	key := pbkdf2.Key(passwordBytes, p.Salt(), p.Iterations(), 64, sha512.New)
 	p.derivedKey, p.derivedMAC = key[:32], key[32:]
 
 	masterKey, err := decryptOpdata01(p.data.getBytes("masterKey"), p.derivedKey, p.derivedMAC)
