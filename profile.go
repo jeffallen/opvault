@@ -30,11 +30,28 @@ type Profile struct {
 	data dataMap
 }
 
-var testPeek []byte
+// UnlockWithTestHook is used for testing password zeroing behavior
+// It returns the password slice so tests can verify it gets zeroed
+func (p *Profile) unlockWithTestHook(password string) ([]byte, error) {
+	passwordBytes := []byte(password)
+	defer wipeSlice(passwordBytes)
+	key := pbkdf2.Key(passwordBytes, p.Salt(), p.Iterations(), 64, sha512.New)
+	p.derivedKey, p.derivedMAC = key[:32], key[32:]
+
+	masterKey, err := decryptOpdata01(p.data.getBytes("masterKey"), p.derivedKey, p.derivedMAC)
+	if err != nil {
+		if err == ErrInvalidOpdata {
+			return passwordBytes, ErrInvalidPassword
+		}
+		return passwordBytes, err
+	}
+
+	wipeSlice(masterKey)
+	return passwordBytes, nil
+}
 
 func (p *Profile) Unlock(password string) error {
 	passwordBytes := []byte(password)
-	testPeek = passwordBytes
 	defer wipeSlice(passwordBytes)
 	key := pbkdf2.Key(passwordBytes, p.Salt(), p.Iterations(), 64, sha512.New)
 	p.derivedKey, p.derivedMAC = key[:32], key[32:]
