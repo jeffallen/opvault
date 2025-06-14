@@ -126,6 +126,7 @@ func (p *Profile) overviewKeys() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	defer wipeSlice(decryptedOverviewKey)
 
 	d := sha512.New()
 	d.Write(decryptedOverviewKey)
@@ -143,6 +144,7 @@ func (p *Profile) masterKeys() ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	defer wipeSlice(decryptedMasterKey)
 
 	d := sha512.New()
 	d.Write(decryptedMasterKey)
