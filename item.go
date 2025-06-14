@@ -114,6 +114,7 @@ func (i *Item) Detail() (*ItemDetail, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer wipeSlice(detailData)
 
 	detail := &ItemDetail{make(dataMap)}
 	err = json.Unmarshal(detailData, &detail.data)
@@ -161,6 +162,7 @@ func (i *Item) itemKeys() ([]byte, []byte, error) {
 	keys := make([]byte, len(data)-16)
 	copy(keys, data[16:])
 	cbc.CryptBlocks(keys, keys)
+	defer wipeSlice(keys)
 
 	return keys[len(keys)-64 : len(keys)-32], keys[len(keys)-32:], nil
 }
@@ -188,6 +190,7 @@ func readItem(profile *Profile, data map[string]interface{}) (*Item, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer wipeSlice(decryptedOverviewData)
 
 	// decode overview data
 	item.overview = make(map[string]interface{})
