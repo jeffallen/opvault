@@ -49,30 +49,37 @@ func TestUnlockZerosMasterPassword(t *testing.T) {
 		t.Fatalf("Failed to get profile: %v", err)
 	}
 
-	// Ensure the test hook variable is reset after the test.
-	defer func() {
-		testPeek = nil
-	}()
-
+	// Test with incorrect password first
 	testPassword := "thisIsATestPassword123!"
-	// We expect Unlock to fail because the password is wrong for the "default" profile,
-	// but the password bytes should still be cleared by the deferred wipeSlice.
-	err = profile.Unlock(testPassword)
+	passwordSlice, err := profile.unlockWithTestHook(testPassword)
 	if err == nil {
-		// This isn't strictly a failure of the zeroing mechanism, but it's unexpected
-		// if the password isn't "freddy". For this test, we focus on the zeroing.
-		// t.Logf("Warning: Unlock succeeded with incorrect password '%s', expected failure.", testPassword)
+		// This shouldn't happen with wrong password, but focus on zeroing test
+		t.Logf("Warning: Unlock succeeded with test password, expected failure")
 	} else if err != ErrInvalidPassword {
-		// If it's another error, it might indicate a problem with setup rather than the password itself.
-		// t.Logf("Unlock failed with an unexpected error: %v. Expected ErrInvalidPassword or success.", err)
+		t.Logf("Unlock failed with unexpected error: %v", err)
 	}
 
-	if testPeek == nil {
-		t.Fatal("testPeek is nil")
+	// Verify password bytes were zeroed
+	verifyPasswordZeroed(t, passwordSlice, len(testPassword))
+
+	// Test with correct password
+	testPassword = "freddy"
+	passwordSlice, err = profile.unlockWithTestHook(testPassword)
+	if err != nil {
+		t.Fatalf("Failed to unlock with correct password: %v", err)
+	}
+
+	// Verify password bytes were zeroed even on success
+	verifyPasswordZeroed(t, passwordSlice, len(testPassword))
+}
+
+func verifyPasswordZeroed(t *testing.T, passwordSlice []byte, expectedLen int) {
+	if passwordSlice == nil {
+		t.Fatal("password slice is nil")
 	}
 
 	allZero := true
-	for i, b := range testPeek {
+	for i, b := range passwordSlice {
 		if b != 0 {
 			allZero = false
 			t.Errorf("Byte at index %d was not zeroed: got %x", i, b)
@@ -80,41 +87,12 @@ func TestUnlockZerosMasterPassword(t *testing.T) {
 	}
 
 	if !allZero {
-		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", testPeek)
+		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", passwordSlice)
 	} else {
-		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(testPeek))
+		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(passwordSlice))
 	}
 
-	if len(testPeek) != len(testPassword) {
-		t.Errorf("Expected testHookMasterPasswordBytes to have length %d (original password length), but got %d. This might indicate the hook didn't capture the correct slice.", len(testPassword), len(testPeek))
-	}
-
-	testPassword = "freddy"
-
-	err = profile.Unlock(testPassword)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if testPeek == nil {
-		t.Fatal("testPeek is nil")
-	}
-
-	allZero = true
-	for i, b := range testPeek {
-		if b != 0 {
-			allZero = false
-			t.Errorf("Byte at index %d was not zeroed: got %x", i, b)
-		}
-	}
-
-	if !allZero {
-		t.Fatalf("Master password bytes were not properly zeroed out in memory. Slice: %x", testPeek)
-	} else {
-		t.Logf("Successfully verified that password bytes (len %d) were zeroed.", len(testPeek))
-	}
-
-	if len(testPeek) != len(testPassword) {
-		t.Errorf("Expected testHookMasterPasswordBytes to have length %d (original password length), but got %d. This might indicate the hook didn't capture the correct slice.", len(testPassword), len(testPeek))
+	if len(passwordSlice) != expectedLen {
+		t.Errorf("Expected password slice to have length %d, but got %d", expectedLen, len(passwordSlice))
 	}
 }
